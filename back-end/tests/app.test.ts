@@ -52,15 +52,6 @@ async function createRecommendation() {
   return recommendation;
 }
 
-/* async function createRecommendationList(number: number) {
-  const recommendationList: recommendationProperties[] = [];
-  for (let i = 0; i < number; i++) {
-    let recommendation: recommendationProperties = await createRecommendation();
-    recommendationList.push(recommendation);
-  }
-  return recommendationList;
-} */
-
 async function get(route: string) {
   const response = await supertest(app).get(route);
   return response;
@@ -75,15 +66,22 @@ async function popDatabase() {
 }
 
 async function updateScore() {
-  const findMany: recommendationProperties[] = await prisma.recommendation.findMany();
-  for (let i = 0; i < findMany.length; i++){
+  const findMany: recommendationProperties[] =
+    await prisma.recommendation.findMany();
+  for (let i = 0; i < findMany.length; i++) {
     await prisma.recommendation.update({
       where: { id: findMany[i].id },
       data: {
-        score: Math.floor(Math.random() * 100)-5,
+        score: Math.floor(Math.random() * 100) - 5,
       },
     });
   }
+}
+
+async function getManyRecommendations() {
+  const manyRecommendations: recommendationProperties[] =
+    await prisma.recommendation.findMany();
+  return manyRecommendations;
 }
 
 // Integration tests
@@ -202,7 +200,7 @@ describe("Test suite: method get - route recommendations/", () => {
   beforeEach(async () => {
     await popDatabase();
   });
-  
+
   it("get last 10 recommendations, expect success", async () => {
     const response = await get(route);
     expect(response.body.length).toBeLessThanOrEqual(10);
@@ -224,28 +222,26 @@ describe("Test suite: method get - route recommendations/:id", () => {
   });
 
   it("get a recommendation by id, expect success", async () => {
-    const check: recommendationProperties[] = await prisma.recommendation.findMany();
-    const { id } = check[indexSelector];
-    const getRouteById: string = `/recommendations/${id}`;
+    const recommendations: recommendationProperties[] =
+      await getManyRecommendations();
+    const getRouteById: string = `/recommendations/${recommendations[indexSelector].id}`;
     const response = await get(getRouteById);
-    expect(response.body.id).toEqual(id);
+    expect(response.body.id).toEqual(recommendations[indexSelector].id);
   });
 
   it("try get a recommendation for an ID that doesn't exist, expect failure", async () => {
-    const check: recommendationProperties[] = await prisma.recommendation.findMany();
-    const { id } = check[indexSelector];
-    const getRouteById: string = `/recommendations/${id}`;
+    const recommendations: recommendationProperties[] = await getManyRecommendations();
+    const getRouteById: string = `/recommendations/${recommendations[indexSelector].id}`;
     await prisma.recommendation.delete({
-      where: { id: id },
+      where: { id: recommendations[indexSelector].id },
     });
     const response = await get(getRouteById);
     expect(response.status).toEqual(404);
   });
 
   it("check if the object received in the get has the correct structure, expect success", async () => {
-    const check: recommendationProperties[] = await prisma.recommendation.findMany();
-    const { id } = check[indexSelector];
-    const getRouteById: string = `/recommendations/${id}`;
+    const recommendations: recommendationProperties[] = await getManyRecommendations();
+    const getRouteById: string = `/recommendations/${recommendations[indexSelector].id}`;
     const response = await get(getRouteById);
     expect(response.body).toHaveProperty("name");
     expect(response.body).toHaveProperty("youtubeLink");
@@ -268,7 +264,7 @@ describe("Test suite: method get - route recommendations/:id", () => {
     console.log(response.body)
     expect(response.body.length).toEqual(amount);
   }); */
-  // checar se a rota responde com o amount pedido
-  // checar se o objeto tem a estrutura correta
-  // checar se os scores estão em ordem decrescente
+// checar se a rota responde com o amount pedido
+// checar se o objeto tem a estrutura correta
+// checar se os scores estão em ordem decrescente
 //});
