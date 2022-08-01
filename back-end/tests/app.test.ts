@@ -3,106 +3,106 @@ import supertest from "supertest";
 import app from "../src/app.js";
 import { prisma } from "../src/database.js";
 
-// 
-const NAME = faker.internet.userName();
-const LINK = "https://www.youtube.com/watch?v=5NV6Rdv1a3I";
+// Environment variables
+const NAME: string = faker.internet.userName();
+const LINK: string = "https://www.youtube.com/watch?v=5NV6Rdv1a3I";
+const route: string = "/recommendations";
+const voidBody: object = {};
 
-// Clean the test database
+// Clean test database
 beforeEach(async() => {
     await prisma.$transaction([
         prisma.$executeRaw`TRUNCATE TABLE recommendations`
     ]);
 });
 
+// Auxiliary functions
+async function post(body: object, route: string) {
+    const response = await supertest(app).post(route).send(body);
+    return response;
+}
 
-describe ("Route recommendations/", () => {
-    it ("given name and youtubeLink, create a register, expect success", async () =>  {
-        const body = { name: NAME, youtubeLink: LINK };
-        const result = await supertest(app).post("/recommendations").send(body);
-        expect(result.status).toEqual(201);
+async function postBody(route: string) {
+    const body = { name: NAME, youtubeLink: LINK };
+    const response = await post(body, route);
+    return response;
+}
+
+async function check(){
+    const check = await prisma.recommendation.findUnique({
+        where: { name: NAME }
+    });
+    return check;
+}
+
+async function createResult() {
+    await postBody(route);
+    const result = await check();
+    return result;
+}
+
+// Integration tests
+describe ("Test suite: method post - route recommendations/", () => {
+
+    it ("given a name as string and a youtube link as string, execute a post, expect success", async () =>  {
+        const response = await postBody(route);
+        expect(response.status).toEqual(201);
     });
 
-    it ("variable name is not a string, expect failure", async () => {
-        const name = 123456;
+    it ("given a name as number and a youtube link as string, execute a post, expect failure", async () => {
+        const name: number = Math.random()*100;
         const body = { name: name, youtubeLink: LINK };
-        const result = await supertest(app).post("/recommendations").send(body);
-        expect(result.status).toEqual(422);
+        const response = await post(body, route);
+        expect(response.status).toEqual(422);
     });
 
-    it ("variable link is not a youtube link, expect failure", async () => {
-        const link = "https://www.google.com";
+    it ("given a name as string and a random link as string, execute a post, expect failure", async () => {
+        const link: string = "https://www.google.com";
         const body = { name: NAME, youtubeLink: link };
-        const result = await supertest(app).post("/recommendations").send(body);
-        expect(result.status).toEqual(422);
+        const response = await post(body, route);
+        expect(response.status).toEqual(422);
     });
 
-    it  ("checks if the data passed by the body creates a record in the database, expect success", async () => {
-        const body = { name: NAME, youtubeLink: LINK };
-        await supertest(app).post("/recommendations").send(body);
-        const check = await prisma.recommendation.findUnique({
-            where: { name: NAME }
-        });
-        expect(check).not.toBeNull();
-        expect(check).not.toBeUndefined();
+    it ("checks if the data passed in the body creates a record in the database, expect success", async () => {
+        const result = await createResult();
+        expect(result).not.toBeNull();
+        expect(result).not.toBeUndefined();
     });
 });
 
-describe ("Route recommendations/:id/upvote", () => {
-    it ("Adiciona um voto", async () => {
-        const body = { name: NAME, youtubeLink: LINK };
-        await supertest(app).post("/recommendations").send(body);
-        const check = await prisma.recommendation.findUnique({
-            where: { name: NAME }
-        });
-        const { id } = check;
-        const voidBody = {};
-        const result = await supertest(app).post(`/recommendations/${id}/upvote`).send(voidBody);
-        expect(result.status).toEqual(200);
+describe ("Test suite: method post - route recommendations/:id/upvote", () => {
+
+    it ("add one vote, expect success", async () => {
+        const result = await createResult();
+        const upvoteRoute: string = `/recommendations/${result.id}/upvote`;
+        const response = await post(voidBody, upvoteRoute);
+        expect(response.status).toEqual(200);
     });
 
-    it ("Adiciona um voto em um id que não existe", async () => {
-        const body = { name: NAME, youtubeLink: LINK };
-        await supertest(app).post("/recommendations").send(body);
-        const check = await prisma.recommendation.findUnique({
-            where: { name: NAME }
-        });
-        const { id } = check;
+    it ("add a vote on an id that doesn't exist, expect failure", async () => {
+        const result = await createResult();
+        const upvoteRoute: string = `/recommendations/${result.id}/upvote`;
         await prisma.recommendation.delete({
             where: { name: NAME }
         });
-        const voidBody = {};
-        const result = await supertest(app).post(`/recommendations/${id}/upvote`).send(voidBody);
-        expect(result.status).toEqual(404);
+        const response = await post(voidBody, upvoteRoute);
+        expect(response.status).toEqual(404);
     });
 
-    it("Checar se o voto foi contado", async () => {
-        const body = { name: NAME, youtubeLink: LINK };
-        await supertest(app).post("/recommendations").send(body);
-        const check = await prisma.recommendation.findUnique({
-            where: { name: NAME }
-        });
-        const { id } = check;
-        const voidBody = {};
-        await supertest(app).post(`/recommendations/${id}/upvote`).send(voidBody);
-        const check2 = await prisma.recommendation.findUnique({
-            where: { name: NAME }
-        });
-        expect(check.score+1).toEqual(check2.score);
+    it("checks if the operation adds only one vote to the database, expect success", async () => {
+        const result = await createResult();
+        const upvoteRoute: string = `/recommendations/${result.id}/upvote`;
+        await post(voidBody, upvoteRoute);
+        const newResult = await check();
+        expect(result.score+1).toEqual(newResult.score);
     });
 
-    it("Checar se o voto foi contado", async () => {
-        const body = { name: NAME, youtubeLink: LINK };
-        await supertest(app).post("/recommendations").send(body);
-        const check = await prisma.recommendation.findUnique({
-            where: { name: NAME }
-        });
-        const { id } = check;
-        const voidBody = {};
-        await supertest(app).post(`/recommendations/${id}/upvote`).send(voidBody);
-        const check2 = await prisma.recommendation.findUnique({
-            where: { name: NAME }
-        });
-        expect(check.score).toEqual(check2.score-1);
+    it("double check of previous operation, expect success", async () => {
+        const result = await createResult();
+        const upvoteRoute: string = `/recommendations/${result.id}/upvote`;
+        await post(voidBody, upvoteRoute);
+        const newResult = await check();
+        expect(result.score).toEqual(newResult.score-1);
     });
 });
 
@@ -115,8 +115,8 @@ describe ("Route recommendations/:id/downvote", () => {
         });
         const { id } = check;
         const voidBody = {};
-        const result = await supertest(app).post(`/recommendations/${id}/downvote`).send(voidBody);
-        expect(result.status).toEqual(200);
+        const response = await supertest(app).post(`/recommendations/${id}/downvote`).send(voidBody);
+        expect(response.status).toEqual(200);
     });
 
     it("Checar se em um downvote não diminui um número diferente de 1", async () => {
@@ -160,8 +160,8 @@ describe ("Route recommendations/:id/downvote", () => {
             where: { name: NAME }
         });
         const voidBody = {};
-        const result = await supertest(app).post(`/recommendations/${id}/downvote`).send(voidBody);
-        expect(result.status).toEqual(404);
+        const response = await supertest(app).post(`/recommendations/${id}/downvote`).send(voidBody);
+        expect(response.status).toEqual(404);
     });
 
     it("Checar a recomendação é excluída abaixo de -5 votos", async () => {
@@ -185,3 +185,4 @@ describe ("Route recommendations/:id/downvote", () => {
         expect(check2).toBeNull();
     });
 });
+
