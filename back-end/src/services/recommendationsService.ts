@@ -8,6 +8,7 @@ async function insert(createRecommendationData: CreateRecommendationData) {
   const existingRecommendation = await recommendationRepository.findByName(
     createRecommendationData.name
   );
+  console.log(existingRecommendation);
   if (existingRecommendation)
     throw conflictError("Recommendations names must be unique");
 
